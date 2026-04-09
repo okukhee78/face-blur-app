@@ -9,27 +9,47 @@ from flask import Flask, render_template, request, url_for, send_file
 
 app = Flask(__name__)
 
-# [해결] 클라우드 서버의 절대 경로를 확실하게 잡습니다.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 app.config['RESULT_FOLDER'] = os.path.join(BASE_DIR, 'static', 'results')
 
-# 폴더 자동 생성 (에러 방지)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
 
 class UniversalFaceBlur:
     def __init__(self):
-        # [해결] 모델 파일 경로를 절대 경로로 지정하여 '파일 없음' 오류 차단
         self.proto_path = os.path.join(BASE_DIR, "deploy.prototxt")
         self.model_path = os.path.join(BASE_DIR, "res10_300x300_ssd_iter_140000.caffemodel")
         
         if not os.path.exists(self.proto_path) or not os.path.exists(self.model_path):
             self.net = None
-            print("⚠️ 모델 파일이 없습니다. 깃허브 업로드를 확인하세요.")
             return
 
         self.net = cv2.dnn.readNetFromCaffe(self.proto_path, self.model_path)
+
+    # 🎯 가짜 얼굴(인형, 그림) 걸러내는 2차 검증 필터 복구
+    def is_real_human(self, face_img, confidence):
+        if face_img.size == 0: return False
+        try:
+            gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
+            if np.std(gray) < 12: return False
+            hsv = cv2.cvtColor(face_img, cv2.COLOR_BGR2HSV)
+            if np.mean(hsv[:,:,1]) > 180: return False
+        except:
+            return False
+        return True
+
+    def draw_3d_heart(self, img, cx, cy, size):
+        t = np.linspace(0, 2 * np.pi, 100)
+        x = 16 * (np.sin(t) ** 3)
+        y = -(13 * np.cos(t) - 5 * np.cos(2*t) - 2 * np.cos(3*t) - np.cos(4*t))
+        scale = size / 35.0
+        x = cx + x * scale
+        y = cy + y * scale - (size * 0.1)
+        points = np.column_stack((x, y)).astype(np.int32)
+        cv2.fillPoly(img, [points], (60, 60, 235)) 
+        highlight_x, highlight_y = cx - int(size * 0.25), cy - int(size * 0.2)
+        cv2.ellipse(img, (highlight_x, highlight_y), (int(size * 0.12), int(size * 0.06)), -30, 0, 360, (255, 255, 255), -1)
 
     def apply_effect(self, img, x, y, w, h, option):
         ih, iw = img.shape[:2]
@@ -49,8 +69,11 @@ class UniversalFaceBlur:
             small = cv2.resize(roi, (b, b), interpolation=cv2.INTER_LINEAR)
             effect_roi = cv2.resize(small, (nw, nh), interpolation=cv2.INTER_NEAREST)
         elif option == 'blur':
-            k = (int(nw / 1.5) // 2 * 2) + 1 # 반드시 홀수
+            k = (int(nw / 1.5) // 2 * 2) + 1 
             effect_roi = cv2.GaussianBlur(roi, (max(15, k), max(15, k)), 0)
+        elif option == 'heart':
+            self.draw_3d_heart(img, nx + nw//2, ny + nh//2, int(max(nw, nh)*0.55))
+            return
         
         img[ny:ny+nh, nx:nx+nw] = np.where(mask == 255, effect_roi, roi)
 
@@ -60,15 +83,30 @@ class UniversalFaceBlur:
         if img is None: return False
         
         h, w = img.shape[:2]
-        # [해결] 메모리 부족 방지를 위해 분석 해상도를 300x300으로 최적화 (502 에러 주원인)
-        blob = cv2.dnn.blobFromImage(img, 1.0, (300, 300), (104.0, 177.0, 123.0))
+        
+        # 🎯 1. 잃어버렸던 시력 보정 기술(CLAHE) 복구: 사진의 윤곽선을 뚜렷하게 만듭니다.
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        hsv[:,:,2] = clahe.apply(hsv[:,:,2])
+        enhanced_img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        # 🎯 2. 황금 해상도(800x800): 1200은 서버가 죽고 300은 눈뜬 장님이라, 딱 중간인 800으로 타협합니다.
+        blob = cv2.dnn.blobFromImage(enhanced_img, 1.0, (800, 800), (104.0, 177.0, 123.0))
         self.net.setInput(blob)
         detections = self.net.forward()
 
         for i in range(detections.shape[2]):
-            if detections[0, 0, i, 2] > 0.25:
+            confidence = detections[0, 0, i, 2]
+            # 🎯 3. 의심 기준 완화: 다시 20%로 낮춰서 웬만한 얼굴은 다 잡아내게 만듭니다.
+            if confidence > 0.20: 
                 box = (detections[0, 0, i, 3:7] * [w, h, w, h]).astype("int")
-                self.apply_effect(img, box[0], box[1], box[2]-box[0], box[3]-box[1], option)
+                startX, startY, endX, endY = max(0,box[0]), max(0,box[1]), min(w,box[2]), min(h,box[3])
+                
+                face_w, face_h = endX - startX, endY - startY
+                if face_w > 5 and face_h > 5:
+                    # 2차 검증 통과 시 블러 처리 적용
+                    if self.is_real_human(img[startY:endY, startX:endX], confidence):
+                        self.apply_effect(img, startX, startY, face_w, face_h, option)
         
         cv2.imwrite(output_path, img)
         return True
@@ -81,7 +119,6 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    # 처리 전 이전 파일 싹 지우기 (서버 용량 관리)
     for f in glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*')):
         try: os.remove(f)
         except: pass
@@ -90,9 +127,10 @@ def upload_files():
     option = request.form.get("option")
     results = []
     
-    for i, file in enumerate(uploaded_files[:5]): # 무료 서버 사양을 고려해 한 번에 5장으로 제한
+    for i, file in enumerate(uploaded_files[:5]): 
         if file and file.filename:
-            fname = f"img_{int(time.time())}_{i}.jpg"
+            ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+            fname = f"img_{int(time.time())}_{i}.{ext}"
             in_p = os.path.join(app.config['UPLOAD_FOLDER'], fname)
             out_p = os.path.join(app.config['RESULT_FOLDER'], f"done_{fname}")
             file.save(in_p)
@@ -110,6 +148,6 @@ def download_all():
     memory_file.seek(0)
     return send_file(memory_file, download_name='photos.zip', as_attachment=True)
 
-# 기존 맨 밑의 if __name__ == '__main__': 부분을 아래처럼 아주 심플하게 바꿉니다.
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
