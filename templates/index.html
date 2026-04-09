@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 얼굴 자동 블러</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; font-size: 24px; }
+        form { margin-top: 20px; }
+        .file-input, .select-box, .submit-btn { width: 100%; margin-bottom: 20px; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
+        .submit-btn { background-color: #3498db; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .submit-btn:hover { background-color: #2980b9; }
+        .download-all-btn { background-color: #27ae60; display: block; text-decoration: none; padding: 12px; border-radius: 8px; color: white; font-weight: bold; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .download-all-btn:hover { background-color: #2ecc71; }
+        .result-img { max-width: 100%; border-radius: 10px; margin-top: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 AI 얼굴 자동 블러</h1>
+        <p>사진을 선택하고 옵션을 고르세요 (최대 10장)</p>
+        
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <input type="file" name="files" class="file-input" multiple accept="image/*" required>
+            
+            <select name="option" class="select-box">
+                <option value="mosaic">1. 모자이크</option>
+                <option value="blur">2. 부드럽게 흐림</option>
+                <option value="heart">3. 3D 빨강 하트</option>
+            </select>
+            
+            <button type="submit" class="submit-btn">변환 시작!</button>
+        </form>
+
+        {% if result_images %}
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <h3>✅ 변환 완료!</h3>
+            
+            <a href="{{ url_for('download_all') }}" class="download-all-btn">
+                📦 변환된 사진 전체 다운로드 (ZIP)
+            </a>
+            
+            {% for img in result_images %}
+                <img src="{{ url_for('static', filename='results/' + img) }}" class="result-img" alt="결과 이미지">
+                <br>
+                <a href="{{ url_for('static', filename='results/' + img) }}" download style="display:inline-block; margin-bottom:20px; color:#3498db; font-weight:bold;">⬇️ 개별 다운로드</a>
+                <br>
+            {% endfor %}
+        {% endif %}
+    </div>
+</body>
+</html>
