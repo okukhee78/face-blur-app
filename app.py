@@ -110,7 +110,6 @@ def download_all():
     memory_file.seek(0)
     return send_file(memory_file, download_name='photos.zip', as_attachment=True)
 
+# 기존 맨 밑의 if __name__ == '__main__': 부분을 아래처럼 아주 심플하게 바꿉니다.
 if __name__ == '__main__':
-    # 렌더 서버 접속을 위한 포트 자동 설정
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run()
