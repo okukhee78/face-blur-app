@@ -3,11 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 얼굴 자동 블러</title>
+    <title>AI 얼굴 자동 블러 - 유림학당</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; text-align: center; }
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; font-size: 24px; }
+        h1 { color: #2c3e50; font-size: 26px; margin-bottom: 10px; }
+        
+        /* 👨‍🏫 제작자 정보 스타일 */
+        .author-info { font-size: 14px; color: #7f8c8d; margin-bottom: 25px; line-height: 1.6; background-color: #f8f9fa; padding: 10px; border-radius: 8px; }
+        .author-info a { color: #3498db; text-decoration: none; font-weight: bold; }
+        .author-info a:hover { text-decoration: underline; color: #2980b9; }
+        
         form { margin-top: 20px; }
         .file-input, .select-box, .submit-btn { width: 100%; margin-bottom: 20px; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
         .submit-btn { background-color: #3498db; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
@@ -20,7 +26,13 @@
 <body>
     <div class="container">
         <h1>🎨 AI 얼굴 자동 블러</h1>
-        <p>사진을 선택하고 옵션을 고르세요 (최대 10장)</p>
+        
+        <div class="author-info">
+            유림학당(<a href="https://hanja4u.cafe24.com" target="_blank">https://hanja4u.cafe24.com</a>) 주인<br>
+            하루 김국회 제작/제공(anyone freeware)
+        </div>
+
+        <p style="font-weight: bold; color: #2c3e50;">사진을 선택하고 옵션을 고르세요 (최대 5장)</p>
         
         <form action="/upload" method="POST" enctype="multipart/form-data">
             <input type="file" name="files" class="file-input" multiple accept="image/*" required>
@@ -45,7 +57,7 @@
             {% for img in result_images %}
                 <img src="{{ url_for('static', filename='results/' + img) }}" class="result-img" alt="결과 이미지">
                 <br>
-                <a href="{{ url_for('static', filename='results/' + img) }}" download style="display:inline-block; margin-bottom:20px; color:#3498db; font-weight:bold;">⬇️ 개별 다운로드</a>
+                <a href="{{ url_for('static', filename='results/' + img) }}" download style="display:inline-block; margin-bottom:20px; color:#3498db; font-weight:bold;">⬇️ 개별 사진 다운로드</a>
                 <br>
             {% endfor %}
         {% endif %}
