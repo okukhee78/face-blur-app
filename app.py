@@ -20,7 +20,6 @@ class UniversalFaceBlur:
     def __init__(self):
         self.proto_path = os.path.join(BASE_DIR, "deploy.prototxt")
         self.model_path = os.path.join(BASE_DIR, "res10_300x300_ssd_iter_140000.caffemodel")
-        
         if not os.path.exists(self.proto_path) or not os.path.exists(self.model_path):
             self.net = None
             return
@@ -40,8 +39,6 @@ class UniversalFaceBlur:
 
     def apply_effect(self, img, x, y, w, h, option):
         ih, iw = img.shape[:2]
-        
-        # 🎯 가림 구역을 다시 30%로 넉넉하게 확장 (빈틈 방지)
         pad_w, pad_h = int(w * 0.30), int(h * 0.30)
         nx, ny = max(0, x - pad_w), max(0, y - pad_h)
         nw, nh = min(iw - nx, w + pad_w * 2), min(ih - ny, h + pad_h * 2)
@@ -54,16 +51,19 @@ class UniversalFaceBlur:
         radius = int(max(nw, nh) * 0.55)
         cv2.circle(mask, (nw//2, nh//2), radius, (255, 255, 255), -1)
 
-        if option == 'mosaic':
+        # 🎯 핵심: 옵션 값이 대문자든 소문자든, 찰떡같이 알아듣도록 강력하게 세팅!
+        option_str = str(option).lower()
+        
+        if 'blur' in option_str: # 'blur' 글자가 있으면 무조건 흐림 처리
+            k = (int(nw / 1.5) // 2 * 2) + 1 
+            effect_roi = cv2.GaussianBlur(roi, (max(15, k), max(15, k)), 0)
+        elif 'heart' in option_str: # 'heart' 글자가 있으면 무조건 하트 처리
+            self.draw_3d_heart(img, nx + nw//2, ny + nh//2, radius)
+            return
+        else: # 그 외 모든 경우는 모자이크
             b = max(4, nw // 30)
             small = cv2.resize(roi, (b, b), interpolation=cv2.INTER_LINEAR)
             effect_roi = cv2.resize(small, (nw, nh), interpolation=cv2.INTER_NEAREST)
-        elif option == 'blur':
-            k = (int(nw / 1.5) // 2 * 2) + 1 
-            effect_roi = cv2.GaussianBlur(roi, (max(15, k), max(15, k)), 0)
-        elif option == 'heart':
-            self.draw_3d_heart(img, nx + nw//2, ny + nh//2, radius)
-            return
         
         img[ny:ny+nh, nx:nx+nw] = np.where(mask == 255, effect_roi, roi)
 
@@ -73,29 +73,23 @@ class UniversalFaceBlur:
         if img is None: return False
         
         h, w = img.shape[:2]
-        
-        # 🎯 대비 보정 복구: 어두운 곳이나 밝은 곳의 얼굴 윤곽을 뚜렷하게 살려냅니다.
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         hsv[:,:,2] = clahe.apply(hsv[:,:,2])
         enhanced_img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-        # 🎯 해상도 최적화(600x600): 서버가 뻗지 않는 선에서 최대한 인공지능 시력을 높였습니다.
         blob = cv2.dnn.blobFromImage(enhanced_img, 1.0, (600, 600), (104.0, 177.0, 123.0))
         self.net.setInput(blob)
         detections = self.net.forward()
 
         for i in range(detections.shape[2]):
             confidence = detections[0, 0, i, 2]
-            
-            # 🎯 확신도 기준 하향(15%): 흐릿하거나 옆모습이어도 일단 가리도록 매우 민감하게 설정!
             if confidence > 0.15: 
                 box = (detections[0, 0, i, 3:7] * [w, h, w, h]).astype("int")
                 startX, startY, endX, endY = max(0,box[0]), max(0,box[1]), min(w,box[2]), min(h,box[3])
                 
                 face_w, face_h = endX - startX, endY - startY
                 if face_w > 5 and face_h > 5:
-                    # 까다로운 필터 없이 바로 블러 처리!
                     self.apply_effect(img, startX, startY, face_w, face_h, option)
         
         cv2.imwrite(output_path, img)
@@ -109,12 +103,16 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
+    # 🎯 핵심: 방금 전까지 테스트하며 만들어졌던 옛날 결과물들을 깨끗하게 지웁니다!
+    for f in glob.glob(os.path.join(app.config['RESULT_FOLDER'], '*')):
+        try: os.remove(f)
+        except: pass
     for f in glob.glob(os.path.join(app.config['UPLOAD_FOLDER'], '*')):
         try: os.remove(f)
         except: pass
         
     uploaded_files = request.files.getlist("files")
-    option = request.form.get("option")
+    option = request.form.get("option", "mosaic") # 폼에서 넘어온 옵션 받기
     results = []
     
     for i, file in enumerate(uploaded_files[:5]): 
