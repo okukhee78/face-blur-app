@@ -9,7 +9,6 @@ from flask import Flask, render_template, request, url_for, send_file
 
 app = Flask(__name__)
 
-# 클라우드 에러 방지용 절대 경로 (뼈대 유지)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 app.config['RESULT_FOLDER'] = os.path.join(BASE_DIR, 'static', 'results')
@@ -27,7 +26,6 @@ class UniversalFaceBlur:
             return
         self.net = cv2.dnn.readNetFromCaffe(self.proto_path, self.model_path)
 
-    # 🎯 [알맹이 복구 1] 가장 정교했던 2차 검증 필터 (그림, 인형 완벽 제외)
     def is_real_human(self, face_img, confidence):
         if face_img.size == 0: return False
         try:
@@ -67,11 +65,9 @@ class UniversalFaceBlur:
         radius = int(max(nw, nh) * 0.55)
         cv2.circle(mask, (nw//2, nh//2), radius, (255, 255, 255), -1)
 
-        # 오류를 막는 옵션 문자열 처리
         option_str = str(option).lower()
 
         if 'blur' in option_str:
-            # 🎯 [알맹이 복구 2] 가장 부드럽고 강력했던 '이중 블러(Double Blur)' 복구
             k = int(nw / 1.5)
             k = k + 1 if k % 2 == 0 else k 
             k = max(15, k)
@@ -94,7 +90,6 @@ class UniversalFaceBlur:
         
         h, w = img.shape[:2]
         
-        # 🎯 [알맹이 복구 3] CLAHE 명암 보정 및 1200 초고해상도 분석 복구
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         hsv[:,:,2] = clahe.apply(hsv[:,:,2])
@@ -127,7 +122,6 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    # 🎯 이전 결과물 찌꺼기 완벽 삭제
     for f in glob.glob(os.path.join(app.config['RESULT_FOLDER'], '*')):
         try: os.remove(f)
         except: pass
@@ -136,10 +130,11 @@ def upload_files():
         except: pass
         
     uploaded_files = request.files.getlist("files")
-    option = request.form.get("option", "mosaic")
+    option = request.form.get("option", "heart") # 기본값을 하트로 변경
     results = []
     
-    for i, file in enumerate(uploaded_files[:5]): 
+    # 🎯 10장까지 처리하도록 수정 완료!
+    for i, file in enumerate(uploaded_files[:10]): 
         if file and file.filename:
             ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
             fname = f"img_{int(time.time())}_{i}.{ext}"
