@@ -9,7 +9,6 @@
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { color: #2c3e50; font-size: 26px; margin-bottom: 10px; }
         
-        /* 👨‍🏫 제작자 정보 스타일 */
         .author-info { font-size: 14px; color: #7f8c8d; margin-bottom: 25px; line-height: 1.6; background-color: #f8f9fa; padding: 10px; border-radius: 8px; }
         .author-info a { color: #3498db; text-decoration: none; font-weight: bold; }
         .author-info a:hover { text-decoration: underline; color: #2980b9; }
@@ -32,15 +31,15 @@
             하루 김국회 제작/제공(anyone freeware)
         </div>
 
-        <p style="font-weight: bold; color: #2c3e50;">사진을 선택하고 옵션을 고르세요 (최대 5장)</p>
+        <p style="font-weight: bold; color: #2c3e50;">사진을 선택하고 옵션을 고르세요 (최대 10장)</p>
         
         <form action="/upload" method="POST" enctype="multipart/form-data">
             <input type="file" name="files" class="file-input" multiple accept="image/*" required>
             
             <select name="option" class="select-box">
-                <option value="mosaic">1. 모자이크</option>
-                <option value="blur">2. 부드럽게 흐림</option>
-                <option value="heart">3. 3D 빨강 하트</option>
+                <option value="heart">1. 3D 빨강 하트</option>
+                <option value="mosaic">2. 모자이크</option>
+                <option value="blur">3. 부드럽게 흐림</option>
             </select>
             
             <button type="submit" class="submit-btn">변환 시작!</button>
