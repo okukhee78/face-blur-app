@@ -130,11 +130,11 @@ def upload_files():
         except: pass
         
     uploaded_files = request.files.getlist("files")
-    option = request.form.get("option", "heart") # 기본값을 하트로 변경
+    option = request.form.get("option", "heart") 
     results = []
     
-    # 🎯 10장까지 처리하도록 수정 완료!
-    for i, file in enumerate(uploaded_files[:10]): 
+    # 🎯 다시 5장으로 안전하게 제한 완료!
+    for i, file in enumerate(uploaded_files[:5]): 
         if file and file.filename:
             ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
             fname = f"img_{int(time.time())}_{i}.{ext}"
